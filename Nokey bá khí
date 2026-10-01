@@ -1,0 +1,203 @@
+local UIS, CoreGui, Plr = game:GetService("UserInputService"), game:GetService("CoreGui"), game:GetService("Players").LocalPlayer
+local RepStorage, Workspace = game:GetService("ReplicatedStorage"), game:GetService("Workspace")
+
+if CoreGui:FindFirstChild("PrimevalEarthGUI") then CoreGui.PrimevalEarthGUI:Destroy() end
+
+local ScreenGui = Instance.new("ScreenGui", CoreGui)
+ScreenGui.Name = "PrimevalEarthGUI"
+ScreenGui.ResetOnSpawn = false
+
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size, MainFrame.Position = UDim2.new(0, 240, 0, 255), UDim2.new(0.5, -120, 0.2, 0)
+MainFrame.BackgroundColor3, MainFrame.BorderSizePixel, MainFrame.Draggable, MainFrame.Active = Color3.fromRGB(30, 30, 30), 0, true, true
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size, Title.Text, Title.TextColor3, Title.BackgroundColor3, Title.Font, Title.TextSize = UDim2.new(1, 0, 0, 30), "PRIMEVAL EARTH MENU", Color3.fromRGB(255, 255, 255), Color3.fromRGB(45, 45, 45), Enum.Font.SourceSansBold, 16
+
+local QuestLabel = Instance.new("TextLabel", MainFrame)
+QuestLabel.Size, QuestLabel.Position, QuestLabel.Text, QuestLabel.TextColor3, QuestLabel.BackgroundColor3, QuestLabel.Font, QuestLabel.TextSize = UDim2.new(1, 0, 0, 20), UDim2.new(0, 0, 0, 30), "Current Quest: Waiting...", Color3.fromRGB(255, 255, 0), Color3.fromRGB(40, 40, 40), Enum.Font.SourceSansBold, 14
+
+_G.CurrentQuest = "None"
+local toggles = { AutoEatRunning = false, AutoDrinkRunning = false, AutoRestRunning = false, AutoZoneRunning = false }
+
+local buttonsConfig = {
+	{ text = "Auto Eat", key = "AutoEatRunning", pos = 55 },
+	{ text = "Auto Drink", key = "AutoDrinkRunning", pos = 95 },
+	{ text = "Auto Rest", key = "AutoRestRunning", pos = 135 },
+	{ text = "Auto Zone", key = "AutoZoneRunning", pos = 175 }
+}
+
+local ZoneButton
+
+for _, btnData in ipairs(buttonsConfig) do
+	local btn = Instance.new("TextButton", MainFrame)
+	btn.Size, btn.Position = UDim2.new(0, 200, 0, 35), UDim2.new(0, 20, 0, btnData.pos)
+	btn.Text, btn.TextColor3, btn.BackgroundColor3, btn.Font, btn.TextSize = btnData.text .. ": OFF", Color3.fromRGB(255, 255, 255), Color3.fromRGB(200, 50, 50), Enum.Font.SourceSansBold, 15
+	
+	if btnData.key == "AutoZoneRunning" then ZoneButton = btn end
+
+	btn.MouseButton1Click:Connect(function()
+		toggles[btnData.key] = not toggles[btnData.key]
+		_G[btnData.key] = toggles[btnData.key]
+		btn.Text = btnData.text .. (toggles[btnData.key] and ": ON" or ": OFF")
+		btn.BackgroundColor3 = toggles[btnData.key] and Color3.fromRGB(50, 180, 50) or Color3.fromRGB(200, 50, 50)
+	end)
+end
+
+UIS.InputBegan:Connect(function(input, processed)
+	if not processed and input.KeyCode == Enum.KeyCode.RightAlt then
+		MainFrame.Visible = not MainFrame.Visible
+	end
+end)
+
+Plr:GetMouse().Button1Down:Connect(function()
+	if UIS:IsKeyDown(Enum.KeyCode.LeftControl) and Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart") and Plr:GetMouse().Target then
+		Plr.Character.HumanoidRootPart.CFrame = CFrame.new(Plr:GetMouse().Hit.X, Plr:GetMouse().Hit.Y + 3, Plr:GetMouse().Hit.Z)
+	end
+end)
+
+Plr.Idled:Connect(function()
+	game:GetService("VirtualUser"):CaptureController()
+	game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+end)
+
+local function IsThisZoneGreen(targetPos)
+	local isGreen = false
+	pcall(function()
+		for _, zoneObj in pairs(Workspace.MapResources.Zones:GetChildren()) do
+			local core = zoneObj:FindFirstChild("LightCore")
+			if core and (core.Position - targetPos).Magnitude < 15 then
+				local color = core.Color
+				if color.R == 0 and color.G > 0.9 and color.B == 0 then isGreen = true end
+				break
+			end
+		end
+	end)
+	return isGreen
+end
+
+local ZonesList = {
+	{ Position = Vector3.new(-144.54, -102.15, 1032.19), Teleport = CFrame.new(-144.54, -87.15, 1032.19) },
+	{ Position = Vector3.new(-617.92, 143.39, -1130.44), Teleport = CFrame.new(-617.92, 158.39, -1130.44) },
+	{ Position = Vector3.new(1449.99, 77.16, -677.59), Teleport = CFrame.new(1449.99, 92.16, -677.59) },
+	{ Position = Vector3.new(276.03, 75.50, -1029.02), Teleport = CFrame.new(276.03, 90.50, -1029.02) },
+	{ Position = Vector3.new(-513.23, 75.73, -430.79), Teleport = CFrame.new(-513.23, 90.73, -430.79) },
+	{ Position = Vector3.new(1090.65, 66.03, 467.14), Teleport = CFrame.new(1090.65, 81.03, 467.14) },
+	{ Position = Vector3.new(209.25, -32.79, -359.19), Teleport = CFrame.new(209.25, -17.79, -359.19) },
+	{ Position = Vector3.new(-170.20, 109.98, 388.42), Teleport = CFrame.new(-170.20, 124.98, 388.42) },
+	{ Position = Vector3.new(-69.11, -61.16, -1493.54), Teleport = CFrame.new(-69.11, -46.16, -1493.54) }
+}
+
+task.spawn(function()
+	while true do
+		if _G.AutoZoneRunning then
+			local hrp = Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+			if hrp then
+				for i, zone in ipairs(ZonesList) do
+					if not _G.AutoZoneRunning then break end
+					if IsThisZoneGreen(zone.Position) then
+						ZoneButton.Text = "Zone " .. i .. " Owned"
+						task.wait(0.05)
+					else
+						hrp.CFrame = zone.Teleport
+						task.wait(0.05)
+						local startTime = tick()
+						while _G.AutoZoneRunning and not IsThisZoneGreen(zone.Position) and (tick() - startTime < 15) do
+							hrp.CFrame = zone.Teleport * CFrame.new(math.sin(tick() * 8) * 0.35, 0, math.cos(tick() * 8) * 0.35)
+							hrp.Velocity = Vector3.new(0, 0, 0)
+							ZoneButton.Text = "Zone " .. i .. " Capturing..."
+							task.wait(0.02)
+						end
+						ZoneButton.Text = "Zone " .. i .. " Captured!"
+						task.wait(0.5)
+					end
+				end
+				if hrp and _G.AutoZoneRunning then hrp.CFrame = CFrame.new(1449.99, 82.16, -677.59) end
+				ZoneButton.Text = "Waiting (5s)..."
+				task.wait(5)
+			else task.wait(0.5) end
+		else task.wait(0.1) end
+	end
+end)
+
+task.spawn(function()
+	while task.wait(0.2) do
+		pcall(function()
+			local questsFrame = Plr:WaitForChild("PlayerGui"):FindFirstChild("GameUI") and Plr.PlayerGui.GameUI:FindFirstChild("QuestsFrame")
+			local detectedQuest = "None"
+			if questsFrame then
+				for _, child in pairs(questsFrame:GetChildren()) do
+					local textContent = ""
+					for _, desc in pairs(child:GetDescendants()) do
+						if desc:IsA("TextLabel") then textContent = textContent .. " " .. string.lower(desc.Text) end
+					end
+					if string.find(textContent, "eat something") then detectedQuest = "Eat" break
+					elseif string.find(textContent, "drink water") then detectedQuest = "Drink" break
+					elseif string.find(textContent, "rest") then detectedQuest = "Rest" break end
+				end
+			end
+			_G.CurrentQuest = detectedQuest
+			
+			local colors = { Eat = Color3.fromRGB(50, 255, 50), Drink = Color3.fromRGB(50, 150, 255), Rest = Color3.fromRGB(255, 165, 0) }
+			QuestLabel.Text = "Current Quest: " .. (detectedQuest == "None" and "Waiting..." or detectedQuest)
+			QuestLabel.TextColor3 = colors[detectedQuest] or Color3.fromRGB(255, 255, 0)
+		end)
+	end
+end)
+
+task.spawn(function()
+	local remote = RepStorage.Remotes.Character.Eat
+	while true do
+		if _G.AutoEatRunning and _G.CurrentQuest == "Eat" then
+			pcall(function()
+				local hrp = Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					local env = Workspace.MapEnvironment
+					local closest, shortest = nil, math.huge
+					local folders = {
+						{ F = env:FindFirstChild("RedWood") and env.RedWood:FindFirstChild("Trees"), N = "RedWoodTree" },
+						{ F = env:FindFirstChild("Pines") and env.Pines:FindFirstChild("Trees"), N = "PineTree" },
+						{ F = env:FindFirstChild("Desert") and env.Desert:FindFirstChild("Tress"), N = "DesertTree" },
+						{ F = env:FindFirstChild("Lobby") and env.Lobby:FindFirstChild("Trees"), N = "RedWoodTree" }
+					}
+					for _, conf in pairs(folders) do
+						if conf.F then
+							for _, tree in pairs(conf.F:GetChildren()) do
+								if tree.Name == conf.N then
+									local p = tree:IsA("BasePart") and tree or tree:FindFirstChildWhichIsA("BasePart")
+									if p and (hrp.Position - p.Position).Magnitude < shortest then
+										shortest, closest = (hrp.Position - p.Position).Magnitude, tree
+									end
+								end
+							end
+						end
+					end
+					if closest then remote:FireServer(closest) end
+				end
+			end)
+			task.wait(0.4)
+		else task.wait(0.2) end
+	end
+end)
+
+task.spawn(function()
+	while true do
+		if _G.AutoDrinkRunning and _G.CurrentQuest == "Drink" then
+			RepStorage.Remotes.Character.CharacterFunctions:InvokeServer("Drink")
+			task.wait(0.8)
+		else task.wait(0.2) end
+	end
+end)
+
+task.spawn(function()
+	local restRemote = RepStorage.Remotes.Character.Rest
+	local isRestingActive = false
+	while true do
+		task.wait(0.3)
+		local shouldRest = _G.AutoRestRunning and (_G.CurrentQuest == "Rest")
+		if shouldRest ~= isRestingActive then
+			pcall(function() restRemote:InvokeServer(shouldRest) end)
+			isRestingActive = shouldRest
+		end
+	end
+end)
